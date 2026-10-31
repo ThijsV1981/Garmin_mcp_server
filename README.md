@@ -45,9 +45,11 @@ Het inlogwachtwoord is wat je straks één keer intypt bij het koppelen in claud
 ### 5. Deployen en checken
 
 ```bash
-fly deploy
+fly deploy --ha=false
 curl https://garmin-mcp-thijs.fly.dev/healthz    # verwacht {"ok":true}
 ```
+
+`fly deploy` maakt de machine zelf aan op basis van `fly.toml`; in het Fly-dashboard hoef je niets aan te maken. `--ha=false` zorgt dat het bij één machine blijft (standaard zet Fly er twee neer voor redundantie, die heb je hier niet nodig).
 
 ### 6. Koppelen in claude.ai
 
