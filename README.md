@@ -34,8 +34,8 @@ Is de naam bezet, kies een andere en pas `app = ...` in `fly.toml` aan.
 Plak de waarden bij de verborgen prompt, zo komen ze niet in je shell-historie:
 
 ```bash
-read -s "GK?Garmin-key: "; echo
-read -s "PW?Inlogwachtwoord (min. 12 tekens): "; echo
+printf "Garmin-key: "; read -s GK; echo
+printf "Inlogwachtwoord (min. 12 tekens): "; read -s PW; echo
 fly secrets set GARMIN_PERSONAL_API_KEY="$GK" LOGIN_PASSWORD="$PW" OAUTH_SIGNING_KEY="$(openssl rand -hex 32)"
 unset GK PW
 ```
