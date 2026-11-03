@@ -11,7 +11,8 @@ Required environment (set as Fly secrets):
   LOGIN_PASSWORD           password you type when connecting a client (>= 12 chars)
   OAUTH_SIGNING_KEY        random secret, e.g. `openssl rand -hex 32`
 Optional:
-  PUBLIC_URL               default https://$FLY_APP_NAME.fly.dev
+  INTERVALS_API_KEY        intervals.icu API key; enables intervals_upsert_workouts
+  PUBLIC_URL              default https://$FLY_APP_NAME.fly.dev
   ALLOWED_REDIRECT_HOSTS   default claude.ai,claude.com
   PORT                     default 8080
 """
@@ -34,6 +35,9 @@ from garmin_personal_mcp import garmin_client
 from garmin_personal_mcp.cli import transport_security
 from garmin_personal_mcp.server import mcp
 
+from pydantic import BaseModel, Field
+
+import intervals
 from oauth import SingleUserOAuthProvider
 from streams import parse_fit
 
@@ -100,6 +104,50 @@ async def garmin_get_activity_streams(
         garmin_client.call, lambda c: c.download_activity(activity_id)
     )
     return await asyncio.to_thread(parse_fit, content, interval_s, include_gps)
+
+
+class PlannedWorkout(BaseModel):
+    external_id: str = Field(description="Own stable key, must start with 'lr-', e.g. 'lr-2026-11-09-0'")
+    date: str = Field(description="YYYY-MM-DD (local)")
+    type: str = Field("Run", description="Run, Ride, Swim, TrailRun or WeightTraining")
+    name: str = Field(description="Title shown in intervals.icu and on the watch")
+    fit_base64: str | None = Field(None, description="Structured workout as a base64 .FIT file (preferred)")
+    description: str | None = Field(None, description="Workout in intervals.icu text syntax, if no FIT file")
+
+
+@mcp.tool(
+    title="Upsert planned workouts in intervals.icu",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True),
+)
+async def intervals_upsert_workouts(
+    workouts: list[PlannedWorkout], prune_from: str | None = None, prune_to: str | None = None
+) -> dict:
+    """Write planned workouts to the intervals.icu calendar (which sends them on
+    to Garmin Connect). Upsert on external_id: sending the same id again
+    overwrites that workout. With prune_from and prune_to (YYYY-MM-DD), workouts
+    with an 'lr-' external_id in that range that are not in `workouts` are
+    deleted, so sessions removed from the plan disappear. Workouts created in
+    intervals.icu by hand are never touched.
+    """
+    try:
+        return await asyncio.to_thread(
+            intervals.upsert_workouts, [w.model_dump() for w in workouts], prune_from, prune_to
+        )
+    except intervals.IntervalsError as e:
+        raise ValueError(str(e)) from None
+
+
+@mcp.tool(
+    title="List planned workouts in intervals.icu",
+    annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
+)
+async def intervals_list_workouts(oldest: str, newest: str) -> list[dict]:
+    """Planned workouts in the intervals.icu calendar between oldest and newest
+    (YYYY-MM-DD), with their external_id ('lr-' = written by the training plan)."""
+    try:
+        return await asyncio.to_thread(intervals.list_workouts, oldest, newest)
+    except intervals.IntervalsError as e:
+        raise ValueError(str(e)) from None
 
 
 @mcp.custom_route("/healthz", methods=["GET"])

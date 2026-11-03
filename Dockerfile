@@ -5,7 +5,7 @@ RUN useradd --create-home app
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py oauth.py streams.py ./
+COPY app.py oauth.py streams.py intervals.py ./
 USER app
 EXPOSE 8080
 CMD ["python", "-W", "ignore::DeprecationWarning", "app.py"]
