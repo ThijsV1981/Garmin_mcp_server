@@ -4,6 +4,7 @@ Persoonlijke, read-only MCP-server voor de Garmin Connect Personal API, gehost o
 
 - Basis: [`garmin-personal-mcp`](https://github.com/Mason-Levyy/garmin-personal-mcp) 0.2.0 (activiteiten, slaap, HRV, rusthartslag, stress, body battery, gewicht, profiel, HS-zones).
 - Toegevoegd: OAuth met één wachtwoord (de upstream-server heeft geen eigen beveiliging), en `garmin_get_activity_streams`: hartslag, snelheid, cadans, vermogen en hoogte per interval uit het .FIT-bestand.
+- Toegevoegd: `intervals_upsert_workouts` en `intervals_list_workouts`: geplande workouts (als .FIT) in je intervals.icu-kalender zetten en terugkijken. intervals.icu stuurt ze door naar Garmin Connect. Upsert op `external_id` (prefix `lr-`), dus opnieuw sturen overschrijft; met `prune_from`/`prune_to` verdwijnen `lr-`-workouts die niet meer in het plan staan. Workouts die je zelf in intervals.icu maakt, blijven altijd staan.
 - Verwijderd: `garmin_download_activity` (sloeg het bestand alleen op de server op).
 
 ## Eenmalige installatie (Mac)
@@ -55,6 +56,18 @@ curl https://garmin-mcp-thijs.fly.dev/healthz    # verwacht {"ok":true}
 
 Voeg een custom connector toe met URL `https://garmin-mcp-thijs.fly.dev/mcp`. Je komt op een donkere inlogpagina: wachtwoord invullen, klaar. Daarna blijft de koppeling 90 dagen geldig en ververst hij zichzelf.
 
+### 7. intervals.icu (optioneel)
+
+intervals.icu → Settings → Developer Settings → API key kopiëren. Daarna:
+
+```bash
+printf "intervals.icu-key: "; read -s IK; echo
+fly secrets set INTERVALS_API_KEY="$IK"
+unset IK
+```
+
+Zet in intervals.icu bij Settings → Connections → Garmin het uploaden van geplande workouts aan, dan komen ze op je horloge.
+
 ## Onderhoud
 
 | Wat | Hoe |
@@ -62,6 +75,7 @@ Voeg een custom connector toe met URL `https://garmin-mcp-thijs.fly.dev/mcp`. Je
 | Garmin-key verloopt (Garmin mailt een week vooraf) | Nieuwe key maken → `fly secrets set GARMIN_PERSONAL_API_KEY="..."` (via `read -s` zoals hierboven) |
 | Alle koppelingen intrekken | `fly secrets set OAUTH_SIGNING_KEY="$(openssl rand -hex 32)"` en daarna opnieuw koppelen |
 | Wachtwoord wijzigen | `fly secrets set LOGIN_PASSWORD="..."` |
+| intervals.icu-key vervangen | `fly secrets set INTERVALS_API_KEY="..."` (via `read -s`) |
 | Logs bekijken | `fly logs` |
 | Update van upstream | Versie in `requirements.txt` ophogen → `fly deploy` |
 
